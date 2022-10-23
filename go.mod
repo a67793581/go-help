@@ -1,3 +1,3 @@
-module github.com/a67793581/go-help
+module gitlab.com/aiku-open-source/go-help
 
 go 1.18
