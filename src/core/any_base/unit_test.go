@@ -12,31 +12,7 @@ func init() {
 }
 
 func TestA(t *testing.T) {
-	var tenToAny []string
-	for i := 33; i < 127; i++ {
-		tenToAny = append(tenToAny, string(rune(i)))
-	}
-	for i := 161; i < 255; i++ {
-		tenToAny = append(tenToAny, string(rune(i)))
-	}
-	tmp := ""
-	//for i := 256; i < 847; i++ {
-	//	//tmp = string(rune(i))
-	//	//fmt.Println(i, tmp, len(tmp))
-	//	tenToAny = append(tenToAny, string(rune(i)))
-	//}
-	//
-	//for i := 848; i < 896; i++ {
-	//	//tmp = string(rune(i))
-	//	//fmt.Println(i, tmp, len(tmp))
-	//	tenToAny = append(tenToAny, string(rune(i)))
-	//}
-
-	//for i := 900; i < 1000; i++ {
-	//	tmp = string(rune(i))
-	//	fmt.Println(i, tmp, len(tmp))
-	//	tenToAny = append(tenToAny, string(rune(i)))
-	//}
+	var tenToAny = []string{"!", "#", "$", "%", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "=", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~", "¡", "¢", "£", "¤", "¥", "¦", "§", "¨", "©", "ª", "«", "¬", "­", "®", "¯", "°", "±", "²", "³", "´", "µ", "¶", "·", "¸", "¹", "º", "»", "¼", "½", "¾", "¿", "À", "Á", "Â", "Ã", "Ä", "Å", "Æ", "Ç", "È", "É", "Ê", "Ë", "Ì", "Í", "Î", "Ï", "Ð", "Ñ", "Ò", "Ó", "Ô", "Õ", "Ö", "×", "Ø", "Ù", "Ú", "Û", "Ü", "Ý", "Þ", "ß", "à", "á", "â", "ã", "ä", "å", "æ", "ç", "è", "é", "ê", "ë", "ì", "í", "î", "ï", "ð", "ñ", "ò", "ó", "ô", "õ", "ö", "÷", "ø", "ù", "ú", "û", "ü", "ý", "þ"}
 
 	uid := []int{
 		10000001,
@@ -54,11 +30,17 @@ func TestA(t *testing.T) {
 	if err != nil {
 		return
 	}
-	fmt.Println(tmp, "json", len(marshal), string(marshal))
+	fmt.Println("json", len(marshal), string(marshal))
 
 	u := strings.Join(uids, " ")
-	fmt.Println(tmp, "空格分隔", len(u), u)
+	fmt.Println("空格分隔", len(u), u)
 
 	res := DecimalToAny(959453809, tenToAny)
-	fmt.Println(tenToAny, len(tenToAny), res, AnyToDecimal(res, tenToAny))
+	bytes, err := json.Marshal(tenToAny)
+	if err != nil {
+		return
+	}
+	fmt.Println(string(bytes))
+	fmt.Println(tenToAny, len(tenToAny))
+	fmt.Println(res, AnyToDecimal(res, tenToAny))
 }
