@@ -1,7 +1,6 @@
 package any_base
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -36,26 +35,21 @@ func AnyToDecimal(str string, num2char []rune) int {
 
 	r := Reverse([]rune(str))
 	max := len(r)
-	fmt.Println("加密字符串长度", max)
 
 	var num float64
 	for i := 0; i < max; i++ {
-		index, err := find(num2char, r[i])
-		if err != nil {
-			panic(err)
-		}
-		num = num + (math.Pow(length, float64(i)) * float64(index))
+		num = num + (math.Pow(length, float64(i)) * float64(find(num2char, r[i])))
 	}
 	return int(num)
 }
 
-func find(num2char []rune, str rune) (int, error) {
+func find(num2char []rune, str rune) int {
 	for i, s := range num2char {
 		if s == str {
-			return i, nil
+			return i
 		}
 	}
-	return -1, fmt.Errorf("编码异常")
+	return -1
 }
 
 func Reverse(r []rune) []rune {
