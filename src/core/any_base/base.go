@@ -63,7 +63,6 @@ func Reverse(r []rune) []rune {
 func GetMap() (m map[int]struct{}) {
 	m = map[int]struct{}{
 		38: {},
-		44: {},
 		60: {},
 		62: {},
 		34: {},
