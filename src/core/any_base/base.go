@@ -1,134 +1,132 @@
 package any_base
 
 import (
+	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-//var tenToAny = map[int]string{
-//	0:  "0",
-//	1:  "1",
-//	2:  "2",
-//	3:  "3",
-//	4:  "4",
-//	5:  "5",
-//	6:  "6",
-//	7:  "7",
-//	8:  "8",
-//	9:  "9",
-//	10: "a",
-//	11: "b",
-//	12: "c",
-//	13: "d",
-//	14: "e",
-//	15: "f",
-//	16: "g",
-//	17: "h",
-//	18: "i",
-//	19: "j",
-//	20: "k",
-//	21: "l",
-//	22: "m",
-//	23: "n",
-//	24: "o",
-//	25: "p",
-//	26: "q",
-//	27: "r",
-//	28: "s",
-//	29: "t",
-//	30: "u",
-//	31: "v",
-//	32: "w",
-//	33: "x",
-//	34: "y",
-//	35: "z",
-//	36: ":",
-//	37: ";",
-//	38: "<",
-//	39: "=",
-//	40: ">",
-//	41: "?",
-//	42: "@",
-//	43: "[",
-//	44: "]",
-//	45: "^",
-//	46: "_",
-//	47: "{",
-//	48: "|",
-//	49: "}",
-//	50: "A",
-//	51: "B",
-//	52: "C",
-//	53: "D",
-//	54: "E",
-//	55: "F",
-//	56: "G",
-//	57: "H",
-//	58: "I",
-//	59: "J",
-//	60: "K",
-//	61: "L",
-//	62: "M",
-//	63: "N",
-//	64: "O",
-//	65: "P",
-//	66: "Q",
-//	67: "R",
-//	68: "S",
-//	69: "T",
-//	70: "U",
-//	71: "V",
-//	72: "W",
-//	73: "X",
-//	74: "Y",
-//	75: "Z",
-//}
-
-//DecimalToAny 10进制转任意进制
-func DecimalToAny(num int, tenToAny []string) string {
-	n := len(tenToAny)
-	newNumStr := ""
-	var remainder int
-	var remainderString string
-	for num != 0 {
-		remainder = num % n
-		if n > remainder && remainder > 9 {
-			remainderString = tenToAny[remainder]
-		} else {
-			remainderString = strconv.Itoa(remainder)
-		}
-		newNumStr = remainderString + newNumStr
-		num = num / n
-	}
-	return newNumStr
-}
-
-// map根据value找key
-func find(in string, tenToAny []string) int {
-	result := -1
-	for k, v := range tenToAny {
-		if in == v {
-			result = k
-		}
-	}
-	return result
-}
-
-//AnyToDecimal 任意进制转10进制
-func AnyToDecimal(num string, tenToAny []string) int {
-	n := float64(len(tenToAny))
-	var newNum float64
-	newNum = 0.0
-	nNum := len(strings.Split(num, "")) - 1
-	for _, value := range strings.Split(num, "") {
-		tmp := float64(find(value, tenToAny))
-		if tmp != -1 {
-			newNum = newNum + tmp*math.Pow(n, float64(nNum))
-			nNum = nNum - 1
-		} else {
+// 10进制数转换 n 进制
+func DecimalToAny(num int, num2char []rune) string {
+	length := len(num2char)
+	var str []rune
+	for {
+		if num <= 0 {
 			break
 		}
+		quotient := num % length // 余数
+		str = append([]rune{num2char[quotient]}, str...)
+		num = num / length // 商数
 	}
-	return int(newNum)
+	return string(str)
+}
+
+// n 进制数转换 10 进制
+func AnyToDecimal(str string, num2char []rune) int {
+	//    $len = strlen($bas);
+	//    $str = strrev($str);
+	//    $num = 0;
+	//    for ($i = 0; $i < strlen($str); $i++) {
+	//        $pos = strpos($bas, $str[$i]);
+	//        $num = $num + (pow($len, $i) * $pos);
+	//    }
+	length := float64(len(num2char))
+
+	r := Reverse([]rune(str))
+	max := len(r)
+	fmt.Println("加密字符串长度", max)
+
+	var num float64
+	for i := 0; i < max; i++ {
+		index, err := find(num2char, r[i])
+		if err != nil {
+			panic(err)
+		}
+		num = num + (math.Pow(length, float64(i)) * float64(index))
+	}
+	return int(num)
+}
+
+func find(num2char []rune, str rune) (int, error) {
+	for i, s := range num2char {
+		if s == str {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("编码异常")
+}
+
+func Reverse(r []rune) []rune {
+	// write code here
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
+	}
+	return r
+}
+
+func GetMap() (m map[int]struct{}) {
+	m = map[int]struct{}{
+		38: {},
+		44: {},
+		60: {},
+		62: {},
+		34: {},
+		92: {},
+	}
+	for i := 126; i < 161; i++ {
+		m[i] = struct{}{}
+	}
+	return
+}
+
+func GetTenToAny(m map[int]struct{}) (tenToAny []rune) {
+	var ok bool
+	//var n int
+	for i := 33; i < 256; i++ {
+		if _, ok = m[i]; ok {
+			continue
+		}
+		//tenToAny[n] = string(rune(i))
+		//n++
+		tenToAny = append(tenToAny, rune(i))
+	}
+	return
+}
+
+func IntegerGroupingEncode(list []int64, sep string) (res string) {
+	if len(list) == 0 {
+		return
+	}
+	var s string
+	var prev int64
+	sort.Slice(list, func(i, j int) bool {
+		return list[i] < list[j]
+	})
+	var r []string
+	for _, v := range list {
+		s = strconv.FormatInt(v-prev, 10)
+		r = append(r, s)
+		prev = v
+	}
+	res = strings.Join(r, sep)
+
+	return
+}
+
+func IntegerGroupingDecode(input string, sep string) (res []int64) {
+	if len(input) == 0 {
+		return
+	}
+	list := strings.Split(input, sep)
+	var prev int64
+	var tmp int64
+	for _, v := range list {
+		ii, _ := strconv.ParseInt(v, 10, 64)
+		tmp = ii
+		prev += tmp
+		res = append(res, prev)
+	}
+	return
 }
