@@ -2,8 +2,7 @@ package async_job
 
 import (
 	"context"
-	"gitlab.com/aiku-open-source/go-help/src/core/logger"
-	"runtime/debug"
+	"gitlab.com/aiku-open-source/go-help/src/core/hotfix"
 	"sync"
 )
 
@@ -49,17 +48,9 @@ func Push(ctx context.Context, f Job) {
 	result.Unlock()
 }
 
-func RecoverError() {
-	if err := recover(); err != nil {
-		if logger.Log != nil {
-			logger.Log.Errorf("err:%+v\nStack:%s", err, string(debug.Stack()))
-		}
-	}
-}
-
 func do(ctx context.Context, req interface{}, resp interface{}, err error) {
 
-	defer RecoverError()
+	defer hotfix.RecoverError()
 	defer DelInstance(ctx)
 	result := GetInstance(ctx)
 	for _, job := range result.jobs {
