@@ -19,11 +19,11 @@ var (
 	instanceSM = sync.Map{}
 )
 
-func DelInstance(ctx context.Context) {
+func delInstance(ctx context.Context) {
 	instanceSM.Delete(ctx)
 }
 
-func GetInstance(ctx context.Context) (result *jobList) {
+func getInstance(ctx context.Context) (result *jobList) {
 	var (
 		ok bool
 		v  interface{}
@@ -42,17 +42,17 @@ func GetInstance(ctx context.Context) (result *jobList) {
 }
 
 func Push(ctx context.Context, f Job) {
-	result := GetInstance(ctx)
+	result := getInstance(ctx)
 	result.Lock()
 	result.jobs = append(result.jobs, f)
 	result.Unlock()
 }
 
-func do(ctx context.Context, req interface{}, resp interface{}, err error) {
+func Run(ctx context.Context, req interface{}, resp interface{}, err error) {
 
 	defer hotfix.RecoverError()
-	defer DelInstance(ctx)
-	result := GetInstance(ctx)
+	defer delInstance(ctx)
+	result := getInstance(ctx)
 	for _, job := range result.jobs {
 		job(ctx, req, resp, err)
 	}

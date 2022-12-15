@@ -31,7 +31,7 @@ func TestDo(t *testing.T) {
 			})
 		}(i)
 	}
-	do(ctx, i1, i1, err)
+	Run(ctx, i1, i1, err)
 	ctx2 := context.Background()
 	i2 := 1
 	for i := 0; i < 10; i++ {
@@ -41,6 +41,6 @@ func TestDo(t *testing.T) {
 			})
 		}(i)
 	}
-	do(ctx2, i2, i2, err)
+	Run(ctx2, i2, i2, err)
 	time.Sleep(1 * time.Second)
 }
