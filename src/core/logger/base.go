@@ -25,22 +25,14 @@ type LoggerV2 interface {
 	// Errorf logs to ERROR log. Arguments are handled in the manner of fmt.Printf.
 	Errorf(format string, args ...interface{})
 	// Fatal logs to ERROR log. Arguments are handled in the manner of fmt.Print.
-	// gRPC ensures that all Fatal logs will exit with os.Exit(1).
-	// Implementations may also call os.Exit() with a non-zero exit code.
 	Fatal(args ...interface{})
 	// Fatalln logs to ERROR log. Arguments are handled in the manner of fmt.Println.
-	// gRPC ensures that all Fatal logs will exit with os.Exit(1).
-	// Implementations may also call os.Exit() with a non-zero exit code.
 	Fatalln(args ...interface{})
 	// Fatalf logs to ERROR log. Arguments are handled in the manner of fmt.Printf.
-	// gRPC ensures that all Fatal logs will exit with os.Exit(1).
-	// Implementations may also call os.Exit() with a non-zero exit code.
 	Fatalf(format string, args ...interface{})
-	// V reports whether verbosity level l is at least the requested verbose level.
-	V(l int) bool
 }
 
 // SetLogger is the setter for log variable, it should be the only way to assign value to log
-func SetLogger(newLogger LoggerV2) {
+func SetLoggerV2(newLogger LoggerV2) {
 	Log = newLogger
 }
