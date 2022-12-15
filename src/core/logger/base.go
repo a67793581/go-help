@@ -10,10 +10,10 @@ type LoggerV2 interface {
 	Info(args ...interface{})
 	// Infof logs to INFO log. Arguments are handled in the manner of fmt.Printf.
 	Infof(format string, args ...interface{})
-	// Warning logs to WARNING log. Arguments are handled in the manner of fmt.Print.
-	Warning(args ...interface{})
-	// Warningf logs to WARNING log. Arguments are handled in the manner of fmt.Printf.
-	Warningf(format string, args ...interface{})
+	// Warn logs to WARNING log. Arguments are handled in the manner of fmt.Print.
+	Warn(args ...interface{})
+	// Warnf logs to WARNING log. Arguments are handled in the manner of fmt.Printf.
+	Warnf(format string, args ...interface{})
 	// Error logs to ERROR log. Arguments are handled in the manner of fmt.Print.
 	Error(args ...interface{})
 	// Errorf logs to ERROR log. Arguments are handled in the manner of fmt.Printf.
