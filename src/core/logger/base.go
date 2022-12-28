@@ -3,9 +3,13 @@
 package logger
 
 // Log is a package level variable, every program should access logging function through "Log"
-var Log LoggerV2
+var Log Logger
 
-type LoggerV2 interface {
+type Logger interface {
+	// Debug logs to INFO log. Arguments are handled in the manner of fmt.Print.
+	Debug(args ...interface{})
+	// Debugf logs to INFO log. Arguments are handled in the manner of fmt.Printf.
+	Debugf(format string, args ...interface{})
 	// Info logs to INFO log. Arguments are handled in the manner of fmt.Print.
 	Info(args ...interface{})
 	// Infof logs to INFO log. Arguments are handled in the manner of fmt.Printf.
@@ -25,6 +29,6 @@ type LoggerV2 interface {
 }
 
 // SetLogger is the setter for log variable, it should be the only way to assign value to log
-func SetLoggerV2(newLogger LoggerV2) {
+func SetLogger(newLogger Logger) {
 	Log = newLogger
 }

@@ -7,68 +7,62 @@ import "go.uber.org/zap"
 // By default, Loggers info at zap's InfoLevel.
 func NewLogger(l *zap.Logger) *Logger {
 	logger := &Logger{
-		log:    l.Sugar(),
-		info:   (*zap.SugaredLogger).Info,
-		infof:  (*zap.SugaredLogger).Infof,
-		warn:   (*zap.SugaredLogger).Warn,
-		warnf:  (*zap.SugaredLogger).Warnf,
-		error:  (*zap.SugaredLogger).Error,
-		errorf: (*zap.SugaredLogger).Errorf,
-		fatal:  (*zap.SugaredLogger).Fatal,
-		fatalf: (*zap.SugaredLogger).Fatalf,
+		log: l.Sugar(),
 	}
 	return logger
 }
 
 // Logger adapts zap's Logger to be compatible with help.Logger.
 type Logger struct {
-	log    *zap.SugaredLogger
-	info   func(*zap.SugaredLogger, ...interface{})
-	infof  func(*zap.SugaredLogger, string, ...interface{})
-	warn   func(*zap.SugaredLogger, ...interface{})
-	warnf  func(*zap.SugaredLogger, string, ...interface{})
-	error  func(*zap.SugaredLogger, ...interface{})
-	errorf func(*zap.SugaredLogger, string, ...interface{})
-	fatal  func(*zap.SugaredLogger, ...interface{})
-	fatalf func(*zap.SugaredLogger, string, ...interface{})
+	log *zap.SugaredLogger
+}
+
+// Debug implements help.Logger.
+func (l *Logger) Debug(args ...interface{}) {
+	l.log.Debug(args...)
+}
+
+// Debugf implements help.Logger.
+func (l *Logger) Debugf(format string, args ...interface{}) {
+	l.log.Debugf(format, args...)
 }
 
 // Info implements help.Logger.
 func (l *Logger) Info(args ...interface{}) {
-	l.info(l.log, args...)
+	l.log.Info(args...)
 }
 
 // Infof implements help.Logger.
 func (l *Logger) Infof(format string, args ...interface{}) {
-	l.infof(l.log, format, args...)
+	l.log.Infof(format, args...)
 }
 
 // Warn implements help.Logger.
 func (l *Logger) Warn(args ...interface{}) {
-	l.info(l.log, args...)
+	l.log.Warn(args...)
 }
 
 // Warnf implements help.Logger.
 func (l *Logger) Warnf(format string, args ...interface{}) {
-	l.infof(l.log, format, args...)
+	l.log.Warnf(format, args...)
 }
 
 // Error implements help.Logger.
 func (l *Logger) Error(args ...interface{}) {
-	l.info(l.log, args...)
+	l.log.Error(args...)
 }
 
 // Errorf implements help.Logger.
 func (l *Logger) Errorf(format string, args ...interface{}) {
-	l.infof(l.log, format, args...)
+	l.log.Errorf(format, args...)
 }
 
 // Fatal implements help.Logger.
 func (l *Logger) Fatal(args ...interface{}) {
-	l.fatal(l.log, args...)
+	l.log.Fatal(args...)
 }
 
 // Fatalf implements help.Logger.
 func (l *Logger) Fatalf(format string, args ...interface{}) {
-	l.fatalf(l.log, format, args...)
+	l.log.Fatalf(format, args...)
 }
