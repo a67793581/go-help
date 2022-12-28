@@ -19,7 +19,7 @@ type Logger struct {
 
 // Debug implements help.Logger.
 func (l *Logger) Debug(args ...interface{}) {
-	l.log.Debug(args...)
+	l.log.Debugln(args...)
 }
 
 // Debugf implements help.Logger.
@@ -29,7 +29,7 @@ func (l *Logger) Debugf(format string, args ...interface{}) {
 
 // Info implements help.Logger.
 func (l *Logger) Info(args ...interface{}) {
-	l.log.Info(args...)
+	l.log.Infoln(args...)
 }
 
 // Infof implements help.Logger.
@@ -39,7 +39,7 @@ func (l *Logger) Infof(format string, args ...interface{}) {
 
 // Warn implements help.Logger.
 func (l *Logger) Warn(args ...interface{}) {
-	l.log.Warn(args...)
+	l.log.Warnln(args...)
 }
 
 // Warnf implements help.Logger.
@@ -49,7 +49,7 @@ func (l *Logger) Warnf(format string, args ...interface{}) {
 
 // Error implements help.Logger.
 func (l *Logger) Error(args ...interface{}) {
-	l.log.Error(args...)
+	l.log.Errorln(args...)
 }
 
 // Errorf implements help.Logger.
@@ -59,7 +59,7 @@ func (l *Logger) Errorf(format string, args ...interface{}) {
 
 // Fatal implements help.Logger.
 func (l *Logger) Fatal(args ...interface{}) {
-	l.log.Fatal(args...)
+	l.log.Fatalln(args...)
 }
 
 // Fatalf implements help.Logger.
