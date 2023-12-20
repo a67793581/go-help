@@ -23,17 +23,17 @@ func delInstance(ctx context.Context) {
 	instanceSM.Delete(ctx)
 }
 
-func getInstance(ctx context.Context) (result *jobList) {
+func getInstance(key string) (result *jobList) {
 	var (
 		ok bool
 		v  interface{}
 	)
-	v, ok = instanceSM.Load(ctx)
+	v, ok = instanceSM.Load(key)
 	if !ok {
 		result = &jobList{
 			jobs: []Job{},
 		}
-		instanceSM.Store(ctx, result)
+		instanceSM.Store(key, result)
 	} else {
 		result = v.(*jobList)
 	}
@@ -41,18 +41,17 @@ func getInstance(ctx context.Context) (result *jobList) {
 	return
 }
 
-func Push(ctx context.Context, f Job) {
-	result := getInstance(ctx)
+func Push(_ context.Context, key string, f Job) {
+	result := getInstance(key)
 	result.Lock()
 	result.jobs = append(result.jobs, f)
 	result.Unlock()
 }
 
-func Run(ctx context.Context, req interface{}, resp interface{}, err error) {
-
+func Run(ctx context.Context, key string, req interface{}, resp interface{}, err error) {
 	defer hotfix.RecoverError()
 	defer delInstance(ctx)
-	result := getInstance(ctx)
+	result := getInstance(key)
 	for _, job := range result.jobs {
 		job(ctx, req, resp, err)
 	}
