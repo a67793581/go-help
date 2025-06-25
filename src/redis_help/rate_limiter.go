@@ -48,22 +48,6 @@ func NewRateLimiter(client redis.UniversalClient, config RateLimitConfig) (*Rate
 		return nil, fmt.Errorf("time unit cannot exceed 32 days")
 	}
 
-	// 检查配置合理性：确保请求密度合理
-	// 计算每秒请求数
-	requestsPerSecond := float64(config.MaxCount) / config.TimeUnit.Seconds()
-
-	// 最小密度：每秒0.1个请求（避免过于宽松）
-	minRequestsPerSecond := 0.1
-	// 最大密度：每秒10000个请求（避免过于严格）
-	maxRequestsPerSecond := 10000.0
-
-	if requestsPerSecond < minRequestsPerSecond {
-		return nil, fmt.Errorf("request density too low: %.2f requests/second (<%.1f), please increase max count or decrease time unit", requestsPerSecond, minRequestsPerSecond)
-	}
-	if requestsPerSecond > maxRequestsPerSecond {
-		return nil, fmt.Errorf("request density too high: %.2f requests/second (>%.0f), please decrease max count or increase time unit", requestsPerSecond, maxRequestsPerSecond)
-	}
-
 	return &RateLimiter{
 		client:   client,
 		key:      config.Key,
