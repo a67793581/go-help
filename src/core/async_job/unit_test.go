@@ -23,8 +23,8 @@ func TestDo(t *testing.T) {
 	i1 := 1
 	for i := 0; i < 10; i++ {
 		func(iii int) {
-			Push(ctx, func(ctx context.Context, req interface{}, resp interface{}, err error) {
-				if err != nil {
+			Push(ctx, func(ctx context.Context, req interface{}, resp interface{}, err1 error) {
+				if err1 != nil {
 					return
 				}
 				fmt.Printf("执行第%d个错误时不执行的函数\n", iii+1)
@@ -36,7 +36,7 @@ func TestDo(t *testing.T) {
 	i2 := 1
 	for i := 0; i < 10; i++ {
 		func(iii int) {
-			Push(ctx, func(ctx context.Context, req interface{}, resp interface{}, err error) {
+			Push(ctx, func(ctx context.Context, req interface{}, resp interface{}, err2 error) {
 				fmt.Printf("执行第%d个错误时也执行的函数\n", iii+1)
 			})
 		}(i)

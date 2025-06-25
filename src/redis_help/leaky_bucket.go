@@ -40,6 +40,22 @@ func NewLeakyBucketRateLimiter(client redis.UniversalClient, config LeakyBucketC
 		return nil, errors.New("key cannot be empty")
 	}
 
+	// 检查配置合理性：确保过期时间在合理范围内
+	// 基础过期时间 = 桶容量 / 漏出速率
+	baseExpireTime := int64(config.Capacity) / config.Rate
+
+	// 最小过期时间：1小时
+	minExpireTime := int64(3600)
+	// 最大过期时间：24小时
+	maxExpireTime := int64(86400)
+
+	if baseExpireTime < minExpireTime {
+		return nil, fmt.Errorf("configuration would result in expire time of %d seconds (<1h), please increase capacity or decrease rate", baseExpireTime)
+	}
+	if baseExpireTime > maxExpireTime {
+		return nil, fmt.Errorf("configuration would result in expire time of %d seconds (>24h), please decrease capacity or increase rate", baseExpireTime)
+	}
+
 	return &LeakyBucketRateLimiter{
 		client:   client,
 		key:      config.Key,
@@ -103,11 +119,9 @@ func (lbrl *LeakyBucketRateLimiter) IsAllowed(ctx context.Context, userId string
 		redis.call('HSET', key, 'tokens', tokens)
 		redis.call('HSET', key, 'last_time', current_time)
 		
-		-- 设置过期时间（桶容量除以速率，确保数据不会永久存储）
+		-- 设置过期时间（配置阶段已验证合理性）
 		local expire_time = math.ceil(capacity / rate)
-		if expire_time > 0 then
-			redis.call('EXPIRE', key, expire_time)
-		end
+		redis.call('EXPIRE', key, expire_time)
 		
 		return {allowed, tokens}
 	`
@@ -179,11 +193,9 @@ func (lbrl *LeakyBucketRateLimiter) GetCurrentTokens(ctx context.Context, userId
 		redis.call('HSET', key, 'tokens', tokens)
 		redis.call('HSET', key, 'last_time', current_time)
 		
-		-- 设置过期时间
+		-- 设置过期时间（配置阶段已验证合理性）
 		local expire_time = math.ceil(capacity / rate)
-		if expire_time > 0 then
-			redis.call('EXPIRE', key, expire_time)
-		end
+		redis.call('EXPIRE', key, expire_time)
 		
 		return tokens
 	`
@@ -268,11 +280,9 @@ func (lbrl *LeakyBucketRateLimiter) AddTokens(ctx context.Context, userId string
 		redis.call('HSET', key, 'tokens', tokens)
 		redis.call('HSET', key, 'last_time', current_time)
 		
-		-- 设置过期时间
+		-- 设置过期时间（配置阶段已验证合理性）
 		local expire_time = math.ceil(capacity / rate)
-		if expire_time > 0 then
-			redis.call('EXPIRE', key, expire_time)
-		end
+		redis.call('EXPIRE', key, expire_time)
 		
 		return tokens
 	`
@@ -312,11 +322,9 @@ func (lbrl *LeakyBucketRateLimiter) SetTokens(ctx context.Context, userId string
 		redis.call('HSET', key, 'tokens', tokens_to_set)
 		redis.call('HSET', key, 'last_time', current_time)
 		
-		-- 设置过期时间
+		-- 设置过期时间（配置阶段已验证合理性）
 		local expire_time = math.ceil(capacity / rate)
-		if expire_time > 0 then
-			redis.call('EXPIRE', key, expire_time)
-		end
+		redis.call('EXPIRE', key, expire_time)
 		
 		return tokens_to_set
 	`

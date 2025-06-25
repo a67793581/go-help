@@ -50,10 +50,25 @@ func NewTokenBucketRateLimiter(client redis.UniversalClient, config TokenBucketC
 		tokensPerRefill = config.MaxTokens
 	}
 
-	// 检查配置合理性：确保过期时间不超过24小时
+	// 检查配置合理性：确保补充间隔不超过24小时
+	if config.RefillInterval > 24*time.Hour {
+		return nil, fmt.Errorf("refill interval cannot exceed 24 hours")
+	}
+
+	// 检查配置合理性：确保过期时间在合理范围内
 	// 过期时间 = 最大令牌数 * 补充间隔 / 每次补充的令牌数
+	// 这个公式表示：如果桶满了，需要多长时间才能完全消耗完所有令牌
 	expireTime := int64(config.MaxTokens) * int64(config.RefillInterval.Seconds()) / tokensPerRefill
-	if expireTime > 86400 { // 24小时 = 86400秒
+
+	// 最小过期时间：1小时
+	minExpireTime := int64(3600)
+	// 最大过期时间：24小时
+	maxExpireTime := int64(86400)
+
+	if expireTime < minExpireTime {
+		return nil, fmt.Errorf("configuration would result in expire time of %d seconds (<1h), please adjust max tokens, refill interval, or tokens per refill", expireTime)
+	}
+	if expireTime > maxExpireTime {
 		return nil, fmt.Errorf("configuration would result in expire time of %d seconds (>24h), please adjust max tokens, refill interval, or tokens per refill", expireTime)
 	}
 
@@ -229,27 +244,41 @@ func (tbrl *TokenBucketRateLimiter) AddTokens(ctx context.Context, userId string
 		return errors.New("tokens must be greater than 0")
 	}
 
-	tokenKey, _ := tbrl.generateKeys(userId)
+	tokenKey, timeKey := tbrl.generateKeys(userId)
+	currentTime := time.Now().Unix()
 
 	script := `
 		local token_key = KEYS[1]
+		local time_key = KEYS[2]
 		local max_tokens = tonumber(ARGV[1])
 		local tokens_to_add = tonumber(ARGV[2])
 		local expire_time = tonumber(ARGV[3])
+		local current_time = tonumber(ARGV[4])
+		
 		local current_tokens = redis.call('GET', token_key)
+		local last_refill_time = redis.call('GET', time_key)
+		
 		if not current_tokens then
 			current_tokens = max_tokens
 		else
 			current_tokens = tonumber(current_tokens)
 		end
+		
+		if not last_refill_time then
+			last_refill_time = current_time
+		else
+			last_refill_time = tonumber(last_refill_time)
+		end
+		
 		local new_tokens = math.min(max_tokens, current_tokens + tokens_to_add)
 		redis.call('SETEX', token_key, expire_time, new_tokens)
+		redis.call('SETEX', time_key, expire_time, last_refill_time)
 		return new_tokens
 	`
 
 	expireTime := tokenBucketExpireSeconds
 
-	_, err := tbrl.client.Eval(ctx, script, []string{tokenKey}, tbrl.maxTokens, tokens, expireTime).Result()
+	_, err := tbrl.client.Eval(ctx, script, []string{tokenKey, timeKey}, tbrl.maxTokens, tokens, expireTime, currentTime).Result()
 	if err != nil {
 		return fmt.Errorf("failed to add tokens: %w", err)
 	}
@@ -268,11 +297,24 @@ func (tbrl *TokenBucketRateLimiter) SetTokens(ctx context.Context, userId string
 		return fmt.Errorf("tokens cannot exceed max tokens (%d)", tbrl.maxTokens)
 	}
 
-	tokenKey, _ := tbrl.generateKeys(userId)
+	tokenKey, timeKey := tbrl.generateKeys(userId)
+	currentTime := time.Now().Unix()
+
+	script := `
+		local token_key = KEYS[1]
+		local time_key = KEYS[2]
+		local tokens_to_set = tonumber(ARGV[1])
+		local expire_time = tonumber(ARGV[2])
+		local current_time = tonumber(ARGV[3])
+		
+		redis.call('SETEX', token_key, expire_time, tokens_to_set)
+		redis.call('SETEX', time_key, expire_time, current_time)
+		return tokens_to_set
+	`
 
 	expireTime := tokenBucketExpireSeconds
 
-	err := tbrl.client.SetEx(ctx, tokenKey, tokens, time.Duration(expireTime)*time.Second).Err()
+	_, err := tbrl.client.Eval(ctx, script, []string{tokenKey, timeKey}, tokens, expireTime, currentTime).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set tokens: %w", err)
 	}

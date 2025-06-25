@@ -40,6 +40,30 @@ func NewRateLimiter(client redis.UniversalClient, config RateLimitConfig) (*Rate
 		return nil, errors.New("key cannot be empty")
 	}
 
+	// 检查配置合理性：确保时间单位在合理范围内
+	if config.TimeUnit < time.Second {
+		return nil, fmt.Errorf("time unit cannot be less than 1 second")
+	}
+	if config.TimeUnit > 24*time.Hour {
+		return nil, fmt.Errorf("time unit cannot exceed 32 days")
+	}
+
+	// 检查配置合理性：确保请求密度合理
+	// 计算每秒请求数
+	requestsPerSecond := float64(config.MaxCount) / config.TimeUnit.Seconds()
+
+	// 最小密度：每秒0.1个请求（避免过于宽松）
+	minRequestsPerSecond := 0.1
+	// 最大密度：每秒10000个请求（避免过于严格）
+	maxRequestsPerSecond := 10000.0
+
+	if requestsPerSecond < minRequestsPerSecond {
+		return nil, fmt.Errorf("request density too low: %.2f requests/second (<%.1f), please increase max count or decrease time unit", requestsPerSecond, minRequestsPerSecond)
+	}
+	if requestsPerSecond > maxRequestsPerSecond {
+		return nil, fmt.Errorf("request density too high: %.2f requests/second (>%.0f), please decrease max count or increase time unit", requestsPerSecond, maxRequestsPerSecond)
+	}
+
 	return &RateLimiter{
 		client:   client,
 		key:      config.Key,
@@ -63,8 +87,15 @@ func (rl *RateLimiter) generateTimeKey() string {
 	case time.Second: // 按秒
 		timeKey = now.Format("20060102150405")
 	default: // 按毫秒或其他时间单位
-		// 对于毫秒级别的时间单位，使用纳秒时间戳除以时间单位来生成key
-		timeKey = fmt.Sprintf("%d", now.UnixNano()/int64(rl.timeUnit))
+		// 对于毫秒级别的时间单位，使用毫秒时间戳除以时间单位来生成key
+		// 确保精度不会丢失
+		if rl.timeUnit < time.Second {
+			// 毫秒级别：使用毫秒时间戳
+			timeKey = fmt.Sprintf("%d", now.UnixMilli()/int64(rl.timeUnit/time.Millisecond))
+		} else {
+			// 其他时间单位：使用秒时间戳
+			timeKey = fmt.Sprintf("%d", now.Unix()/int64(rl.timeUnit/time.Second))
+		}
 	}
 
 	return fmt.Sprintf("%s:%s", rl.key, timeKey)
