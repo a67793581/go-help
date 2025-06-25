@@ -2,17 +2,13 @@ package gofunc
 
 import (
 	"context"
-	"gitlab.com/aiku-open-source/go-help/src/core/logger"
+	"gitlab.com/aiku-open-source/go-help/src/core/hotfix"
 	"time"
 )
 
 func Coroutine(ctx context.Context, f func()) {
 	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logger.Log.Error(ctx, "GoFunc err:", err)
-			}
-		}()
+		defer hotfix.RecoverError()
 
 		f()
 	}()
@@ -25,9 +21,7 @@ func CoroutineWithTimeOut(ctx context.Context, timeout time.Duration, f func(tim
 	go func() {
 		defer func() {
 			cancel() // 确保协程完成后取消上下文
-			if err := recover(); err != nil {
-				logger.Log.Error(timeoutCtx, "GoFunc err:", err)
-			}
+			hotfix.RecoverError()
 		}()
 
 		f(timeoutCtx)
