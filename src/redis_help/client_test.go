@@ -67,8 +67,9 @@ func TestRegisterCache(t *testing.T) {
 		configs []DataRedis
 	}
 	tests := []struct {
-		name string
-		args args
+		name    string
+		args    args
+		wantErr bool
 	}{
 		{
 			name: "Multiple Redis Configurations",
@@ -90,18 +91,49 @@ func TestRegisterCache(t *testing.T) {
 					},
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "Empty Address",
+			args: args{
+				configs: []DataRedis{
+					{
+						Alias:   "test",
+						Address: "",
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty Alias",
+			args: args{
+				configs: []DataRedis{
+					{
+						Alias:   "",
+						Address: "localhost:6379",
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := RegisterCache(tt.args.configs)
-			if len(got) != len(tt.args.configs) {
-				t.Errorf("RegisterCache() returned %d clients, expected %d", len(got), len(tt.args.configs))
+			got, err := RegisterCache(tt.args.configs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RegisterCache() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-			for _, config := range tt.args.configs {
-				if _, exists := got[config.Alias]; !exists {
-					t.Errorf("RegisterCache() missing client for alias %s", config.Alias)
+			if !tt.wantErr {
+				if len(got) != len(tt.args.configs) {
+					t.Errorf("RegisterCache() returned %d clients, expected %d", len(got), len(tt.args.configs))
+				}
+				for _, config := range tt.args.configs {
+					if _, exists := got[config.Alias]; !exists {
+						t.Errorf("RegisterCache() missing client for alias %s", config.Alias)
+					}
 				}
 			}
 		})

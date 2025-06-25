@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -66,22 +65,20 @@ func NewRedis(config *DataRedis) (redis.UniversalClient, error) {
 }
 
 // RegisterCache ...
-func RegisterCache(configs []DataRedis) map[string]redis.UniversalClient {
+func RegisterCache(configs []DataRedis) (map[string]redis.UniversalClient, error) {
 
 	Handlers := map[string]redis.UniversalClient{}
 	for _, v := range configs {
 		if len(v.Address) == 0 || v.Alias == "" {
-			log.Fatal(fmt.Sprintf("the Address or alias of %s not exist", v.Alias))
-			continue
+			return nil, fmt.Errorf("the Address or alias of %s not exist", v.Alias)
 		}
 
 		h, err := NewRedis(&v)
 		if err != nil {
-			log.Fatal(fmt.Sprintf("connect to Redis %s failed: %v", v.Alias, err))
-			continue
+			return nil, fmt.Errorf("connect to Redis %s failed: %v", v.Alias, err)
 		}
 
 		Handlers[v.Alias] = h
 	}
-	return Handlers
+	return Handlers, nil
 }
