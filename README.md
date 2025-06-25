@@ -1,8 +1,8 @@
 # go-help
 
 ## 文档
-- [中文说明](README.md)
-- [English README](README-en.md)
+- [English README](README.md)
+- [中文说明](README-cn.md)
 
 
 ## 描述

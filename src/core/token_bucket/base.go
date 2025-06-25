@@ -18,9 +18,11 @@ func NewTokenBucket(max int) *TokenBucket {
 
 func (t *TokenBucket) TickerPush(intervalSecond, num int) {
 	t.Push(num)
+	ticker := time.NewTicker(time.Second * time.Duration(intervalSecond))
+	defer ticker.Stop()
 	for {
 		select {
-		case <-time.NewTicker(time.Second * time.Duration(intervalSecond)).C:
+		case <-ticker.C:
 			if len(t.c) <= t.max-num {
 				t.Push(num)
 			}
