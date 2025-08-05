@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRateLimiterV2(t *testing.T) {
+func TestRateLimiterV2_NewRateLimiterV2(t *testing.T) {
+	// 确保没有gomonkey的patches影响此测试
+	patches := gomonkey.NewPatches()
+	patches.Reset()
 	// 启动一个模拟的Redis服务器
 	s, err := miniredis.Run()
 	assert.NoError(t, err)

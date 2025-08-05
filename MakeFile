@@ -1,0 +1,5 @@
+test:
+	@echo "TestRateLimiter..."
+	@go test -gcflags="-l" gitlab.com/aiku-open-source/go-help/src/redis_help -run TestRateLimiter
+	@echo "TestRateLimiterV2..."
+	@go test -gcflags="-l" gitlab.com/aiku-open-source/go-help/src/redis_help -run TestRateLimiterV2
