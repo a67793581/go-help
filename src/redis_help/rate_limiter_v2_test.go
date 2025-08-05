@@ -1,0 +1,483 @@
+package redis_help
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestNewRateLimiterV2(t *testing.T) {
+	// 启动一个模拟的Redis服务器
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	// 创建Redis客户端
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	tests := []struct {
+		name        string
+		client      redis.UniversalClient
+		config      RateLimitConfigV2
+		expectError bool
+	}{
+		{
+			name:   "valid config",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 100,
+				TimeUnit: time.Hour,
+				Timezone: time.UTC,
+			},
+			expectError: false,
+		},
+		{
+			name:   "nil client",
+			client: nil,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 100,
+				TimeUnit: time.Hour,
+			},
+			expectError: true,
+		},
+		{
+			name:   "empty key",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "",
+				MaxCount: 100,
+				TimeUnit: time.Hour,
+			},
+			expectError: true,
+		},
+		{
+			name:   "zero max count",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 0,
+				TimeUnit: time.Hour,
+			},
+			expectError: true,
+		},
+		{
+			name:   "negative time unit",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 100,
+				TimeUnit: -time.Hour,
+			},
+			expectError: true,
+		},
+		{
+			name:   "time unit less than second",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 100,
+				TimeUnit: time.Millisecond,
+			},
+			expectError: true,
+		},
+		{
+			name:   "time unit exceeds 24 hours",
+			client: client,
+			config: RateLimitConfigV2{
+				Key:      "test_key",
+				MaxCount: 100,
+				TimeUnit: 25 * 24 * time.Hour,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewRateLimiterV2(tt.client, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRateLimiterV2_IsAllowed(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_limit",
+		MaxCount: 3,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 第一次请求，应该允许
+	allowed, remaining, err := rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+	assert.Equal(t, int64(2), remaining)
+
+	// 第二次请求，应该允许
+	allowed, remaining, err = rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+	assert.Equal(t, int64(1), remaining)
+
+	// 第三次请求，应该允许
+	allowed, remaining, err = rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+	assert.Equal(t, int64(0), remaining)
+
+	// 第四次请求，应该拒绝
+	allowed, remaining, err = rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.False(t, allowed)
+	assert.Equal(t, int64(0), remaining)
+}
+
+func TestRateLimiterV2_GetCurrentCount(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_current",
+		MaxCount: 10,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 初始计数应该为0
+	count, err := rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+
+	// 增加一次计数
+	allowed, _, err := rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+
+	// 检查当前计数
+	count, err = rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestRateLimiterV2_GetRemainingCount(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_remaining",
+		MaxCount: 5,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 初始剩余次数应该为最大值
+	remaining, err := rl.GetRemainingCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5), remaining)
+
+	// 使用一次
+	_, _, err = rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+
+	// 剩余次数应该减少1
+	remaining, err = rl.GetRemainingCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(4), remaining)
+}
+
+func TestRateLimiterV2_IncreaseCount(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_increase",
+		MaxCount: 10,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 增加计数
+	err = rl.IncreaseCount(ctx, 3)
+	assert.NoError(t, err)
+
+	// 检查当前计数
+	count, err := rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(3), count)
+
+	// 再次增加
+	err = rl.IncreaseCount(ctx, 2)
+	assert.NoError(t, err)
+
+	// 检查当前计数
+	count, err = rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5), count)
+
+	// 测试无效增量
+	err = rl.IncreaseCount(ctx, 0)
+	assert.Error(t, err)
+
+	err = rl.IncreaseCount(ctx, -1)
+	assert.Error(t, err)
+}
+
+func TestRateLimiterV2_SetCount(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_set",
+		MaxCount: 10,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 设置计数
+	err = rl.SetCount(ctx, 7)
+	assert.NoError(t, err)
+
+	// 检查当前计数
+	count, err := rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(7), count)
+
+	// 设置为0
+	err = rl.SetCount(ctx, 0)
+	assert.NoError(t, err)
+
+	// 检查当前计数
+	count, err = rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+
+	// 测试负数
+	err = rl.SetCount(ctx, -1)
+	assert.Error(t, err)
+}
+
+func TestRateLimiterV2_ResetRateLimit(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	config := RateLimitConfigV2{
+		Key:      "test_reset",
+		MaxCount: 3,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 使用几次限流器
+	for i := 0; i < 3; i++ {
+		allowed, _, err := rl.IsAllowed(ctx)
+		assert.NoError(t, err)
+		assert.True(t, allowed)
+	}
+
+	// 检查当前计数
+	count, err := rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(3), count)
+
+	// 重置
+	err = rl.ResetRateLimit(ctx)
+	assert.NoError(t, err)
+
+	// 检查计数是否重置
+	count, err = rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+
+	// 应该再次允许请求
+	allowed, remaining, err := rl.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+	assert.Equal(t, int64(2), remaining)
+}
+
+func TestRateLimiterV2_GetConfig(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	tz := time.FixedZone("TestZone", 8*3600) // UTC+8
+
+	config := RateLimitConfigV2{
+		Key:      "test_config",
+		MaxCount: 100,
+		TimeUnit: time.Hour,
+		Timezone: tz,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	key, maxCount, timeUnit, timezone := rl.GetConfig()
+	assert.Equal(t, "test_config", key)
+	assert.Equal(t, int64(100), maxCount)
+	assert.Equal(t, time.Hour, timeUnit)
+	assert.Equal(t, tz, timezone)
+}
+
+func TestRateLimiterV2_TimezoneHandling(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	// 使用UTC时区
+	utcConfig := RateLimitConfigV2{
+		Key:      "test_utc",
+		MaxCount: 10,
+		TimeUnit: time.Hour,
+		Timezone: time.UTC,
+	}
+
+	utcLimiter, err := NewRateLimiterV2(client, utcConfig)
+	assert.NoError(t, err)
+
+	// 使用东八区时区
+	cst, _ := time.LoadLocation("Asia/Shanghai")
+	cstConfig := RateLimitConfigV2{
+		Key:      "test_cst",
+		MaxCount: 10,
+		TimeUnit: time.Hour,
+		Timezone: cst,
+	}
+
+	cstLimiter, err := NewRateLimiterV2(client, cstConfig)
+	assert.NoError(t, err)
+
+	// 验证两个限流器使用不同的key（因为时区不同）
+	utcKey := utcLimiter.generateTimeKey()
+	cstKey := cstLimiter.generateTimeKey()
+
+	// 如果当前时间在不同时区属于不同小时，则key应该不同
+	assert.NotEqual(t, utcKey, cstKey)
+}
+
+func TestRateLimiterV2_DifferentTimeUnits(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	ctx := context.Background()
+
+	// 测试按秒限流
+	secondConfig := RateLimitConfigV2{
+		Key:      "test_second",
+		MaxCount: 2,
+		TimeUnit: time.Second,
+		Timezone: time.UTC,
+	}
+
+	secondLimiter, err := NewRateLimiterV2(client, secondConfig)
+	assert.NoError(t, err)
+
+	// 使用所有配额
+	for i := 0; i < 2; i++ {
+		allowed, _, err := secondLimiter.IsAllowed(ctx)
+		assert.NoError(t, err)
+		assert.True(t, allowed)
+	}
+
+	// 应该被拒绝
+	allowed, _, err := secondLimiter.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.False(t, allowed)
+
+	// 等待一秒，计数器应该重置
+	time.Sleep(time.Second)
+
+	// 应该再次允许
+	allowed, _, err = secondLimiter.IsAllowed(ctx)
+	assert.NoError(t, err)
+	assert.True(t, allowed)
+}

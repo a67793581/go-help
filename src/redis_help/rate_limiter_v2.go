@@ -109,12 +109,6 @@ func (rl *RateLimiterV2) IsAllowed(ctx context.Context) (bool, int64, error) {
 
 	// 计算过期时间
 	expireTime := rl.calculateExpireTime()
-	expireSeconds := int(expireTime.Seconds())
-
-	// 确保过期时间至少为1秒
-	if expireSeconds <= 0 {
-		expireSeconds = 1
-	}
 
 	// 使用Lua脚本确保原子性操作（改为增量计数模式）
 	script := `
@@ -122,36 +116,26 @@ func (rl *RateLimiterV2) IsAllowed(ctx context.Context) (bool, int64, error) {
 		local max_count = tonumber(ARGV[1])
 		local expire_time = tonumber(ARGV[2])
 		
-		-- 获取当前计数
-		local current_count = redis.call('GET', key)
-		
-		-- 如果key不存在，初始化为0
-		if not current_count then
-			current_count = 0
-		else
-			current_count = tonumber(current_count)
-		end
-		
 		-- 增加计数
-		local new_count = current_count + 1
+		local new_count = redis.call('INCRBY', key, 1)
 		
 		-- 如果是第一次请求，设置过期时间
-		if current_count == 0 then
-			redis.call('SETEX', key, expire_time, new_count)
-		else
-			redis.call('SET', key, new_count)
+		if new_count == 1 then
+			redis.call('EXPIRE', key, expire_time)
 		end
 		
 		-- 检查是否超过限制
 		if new_count > max_count then
-			return {0, max_count - current_count}
+			-- 恢复计数（减1）
+			redis.call('DECRBY', key, 1)
+			return {0, max_count - (new_count - 1)}
 		end
 		
 		return {1, max_count - new_count}
 	`
 
 	// 执行Lua脚本
-	result, err := rl.client.Eval(ctx, script, []string{timeKey}, rl.maxCount, expireSeconds).Result()
+	result, err := rl.client.Eval(ctx, script, []string{timeKey}, rl.maxCount, int(expireTime.Seconds())).Result()
 	if err != nil {
 		return false, 0, fmt.Errorf("failed to execute rate limit script: %w", err)
 	}
@@ -204,6 +188,74 @@ func (rl *RateLimiterV2) GetRemainingCount(ctx context.Context) (int64, error) {
 		return 0, nil
 	}
 	return remaining, nil
+}
+
+// IncreaseCount 增加已使用次数（用于补偿或重置）
+func (rl *RateLimiterV2) IncreaseCount(ctx context.Context, increment int64) error {
+	if increment <= 0 {
+		return errors.New("increment must be greater than 0")
+	}
+
+	// 生成包含时间单位的key
+	timeKey := rl.generateTimeKey()
+
+	// 计算过期时间
+	expireTime := rl.calculateExpireTime()
+	expireSeconds := int(expireTime.Seconds())
+
+	// 确保过期时间至少为1秒
+	if expireSeconds <= 0 {
+		expireSeconds = 1
+	}
+
+	// 使用Lua脚本确保原子性操作
+	script := `
+		local key = KEYS[1]
+		local increment = tonumber(ARGV[1])
+		local expire_time = tonumber(ARGV[2])
+		
+		-- 增加计数
+		local new_count = redis.call('INCRBY', key, increment)
+		
+		-- 设置过期时间
+		redis.call('EXPIRE', key, expire_time)
+		
+		return new_count
+	`
+
+	// 执行Lua脚本
+	_, err := rl.client.Eval(ctx, script, []string{timeKey}, increment, expireSeconds).Result()
+	if err != nil {
+		return fmt.Errorf("failed to increase count: %w", err)
+	}
+
+	return nil
+}
+
+// SetCount 直接设置已使用次数
+func (rl *RateLimiterV2) SetCount(ctx context.Context, count int64) error {
+	if count < 0 {
+		return errors.New("count cannot be negative")
+	}
+
+	// 生成包含时间单位的key
+	timeKey := rl.generateTimeKey()
+
+	// 计算过期时间
+	expireTime := rl.calculateExpireTime()
+	expireSeconds := int(expireTime.Seconds())
+
+	// 确保过期时间至少为1秒
+	if expireSeconds <= 0 {
+		expireSeconds = 1
+	}
+
+	err := rl.client.SetEx(ctx, timeKey, count, time.Duration(expireSeconds)*time.Second).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set count: %w", err)
+	}
+
+	return nil
 }
 
 // ResetRateLimit 重置限流计数器

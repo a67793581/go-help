@@ -6,15 +6,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTokenBucketRateLimiter(t *testing.T) {
+	// 创建测试用的Redis服务
+	s, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("Failed to start miniredis: %v", err)
+	}
+	defer s.Close()
+
 	// 创建Redis客户端
 	client := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-		DB:   15, // 使用不同的数据库避免冲突
+		Addr: s.Addr(),
 	})
 	defer client.Close()
 
