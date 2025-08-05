@@ -147,26 +147,16 @@ func TestRateLimiterV2_IsAllowed(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 第一次请求，应该允许
+	// 循环测试允许的请求
+	for i := 0; i < 3; i++ {
+		allowed, remaining, err := rl.IsAllowed(ctx)
+		assert.NoError(t, err)
+		assert.True(t, allowed)
+		assert.Equal(t, int64(2-i), remaining)
+	}
+
+	// 测试超出限制的请求
 	allowed, remaining, err := rl.IsAllowed(ctx)
-	assert.NoError(t, err)
-	assert.True(t, allowed)
-	assert.Equal(t, int64(2), remaining)
-
-	// 第二次请求，应该允许
-	allowed, remaining, err = rl.IsAllowed(ctx)
-	assert.NoError(t, err)
-	assert.True(t, allowed)
-	assert.Equal(t, int64(1), remaining)
-
-	// 第三次请求，应该允许
-	allowed, remaining, err = rl.IsAllowed(ctx)
-	assert.NoError(t, err)
-	assert.True(t, allowed)
-	assert.Equal(t, int64(0), remaining)
-
-	// 第四次请求，应该拒绝
-	allowed, remaining, err = rl.IsAllowed(ctx)
 	assert.NoError(t, err)
 	assert.False(t, allowed)
 	assert.Equal(t, int64(0), remaining)
@@ -319,7 +309,11 @@ func TestRateLimiterV2_IncreaseCount(t *testing.T) {
 	assert.Error(t, err)
 
 	err = rl.IncreaseCount(ctx, -1)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	// 检查当前计数
+	count, err = rl.GetCurrentCount(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(4), count)
 }
 
 func TestRateLimiterV2_SetCount(t *testing.T) {

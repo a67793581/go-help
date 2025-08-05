@@ -192,8 +192,8 @@ func (rl *RateLimiterV2) GetRemainingCount(ctx context.Context) (int64, error) {
 
 // IncreaseCount 增加已使用次数（用于补偿或重置）
 func (rl *RateLimiterV2) IncreaseCount(ctx context.Context, increment int64) error {
-	if increment <= 0 {
-		return errors.New("increment must be greater than 0")
+	if increment == 0 {
+		return errors.New("increment == 0")
 	}
 
 	// 生成包含时间单位的key
