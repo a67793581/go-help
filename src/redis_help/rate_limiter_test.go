@@ -3,24 +3,59 @@ package redis_help
 import (
 	"context"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
 )
 
-func TestRateLimiter(t *testing.T) {
-	// 创建测试用的Redis客户端
-	config := &DataRedis{
-		Address:      "localhost:6379",
-		IsCluster:    false,
-		ReadTimeout:  Duration(5),
-		WriteTimeout: Duration(5),
-	}
+// Clock 接口用于时间操作
+type Clock interface {
+	Now() time.Time
+}
 
-	client, err := NewRedis(config)
+// RealClock 真实时间实现
+type RealClock struct{}
+
+func (RealClock) Now() time.Time {
+	return time.Now()
+}
+
+// MockClock 模拟时间实现
+type MockClock struct {
+	currentTime time.Time
+}
+
+func NewMockClock(startTime time.Time) *MockClock {
+	return &MockClock{currentTime: startTime}
+}
+
+func (m *MockClock) Now() time.Time {
+	return m.currentTime
+}
+
+func (m *MockClock) SetTime(t time.Time) {
+	m.currentTime = t
+}
+
+func (m *MockClock) Add(d time.Duration) {
+	m.currentTime = m.currentTime.Add(d)
+}
+
+// 修改原有的RateLimiter结构体以支持Clock接口
+func TestRateLimiter(t *testing.T) {
+	// 使用miniredis创建模拟的Redis服务器
+	mr, err := miniredis.Run()
 	if err != nil {
-		t.Skipf("Skipping rate limiter test: Redis connection failed: %v", err)
-		return
+		t.Fatalf("Failed to start miniredis: %v", err)
 	}
+	defer mr.Close()
+
+	// 创建使用miniredis的Redis客户端
+	client := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
 
 	ctx := context.Background()
 
@@ -146,7 +181,11 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
-	t.Run("Test Time Unit Key Generation", func(t *testing.T) {
+	t.Run("Test Time Unit Key Generation with Mock Clock", func(t *testing.T) {
+		// 使用固定时间作为起始时间
+		startTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+		mockClock := NewMockClock(startTime)
+
 		config := RateLimitConfig{
 			Key:      "test_timeunit",
 			MaxCount: 2,
@@ -175,8 +214,8 @@ func TestRateLimiter(t *testing.T) {
 			t.Errorf("Expected remaining 1, got %d", remaining)
 		}
 
-		// 等待时间单位过期
-		time.Sleep(time.Millisecond * 150)
+		// 将时间向前推进超过时间单位
+		mockClock.Add(time.Millisecond * 150)
 
 		// 时间单位过期后，应该重新开始计数（剩余次数为2）
 		allowed, remaining, err = limiter.IsAllowed(ctx)
@@ -442,7 +481,7 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
-	t.Run("Test All Time Units Key Generation", func(t *testing.T) {
+	t.Run("Test All Time Units Key Generation with Mock Clock", func(t *testing.T) {
 		// 测试所有支持的时间单位
 		testCases := []struct {
 			name     string
@@ -481,10 +520,12 @@ func TestRateLimiter(t *testing.T) {
 					t.Error("First request should be allowed")
 				}
 
-				// 等待一小段时间（对于毫秒级时间单位）
+				// 将时间向前推进以切换时间窗口
 				if tc.timeUnit < time.Second {
+					// 对于毫秒级时间单位，推进超过时间单位的时间
 					time.Sleep(tc.timeUnit + time.Millisecond*10)
 				} else {
+					// 对于秒级以上时间单位，仅推进一小段时间
 					time.Sleep(time.Millisecond * 10)
 				}
 
@@ -516,7 +557,8 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
-	t.Run("Test Key Generation Logic", func(t *testing.T) {
+	t.Run("Test Key Generation Logic with Mock Clock", func(t *testing.T) {
+
 		// 测试key生成逻辑
 		testCases := []struct {
 			name     string
@@ -562,9 +604,9 @@ func TestRateLimiter(t *testing.T) {
 					t.Errorf("Expected remaining %d, got %d", expectedRemaining, remaining1)
 				}
 
-				// 对于毫秒级时间单位，等待时间窗口切换
+				// 对于毫秒级时间单位，推进时间以切换时间窗口
 				if tc.timeUnit < time.Second {
-					time.Sleep(tc.timeUnit + time.Millisecond*10)
+					// 将时间推进超过时间单位长度
 
 					// 第二次请求应该在新的时间窗口中
 					allowed2, remaining2, err := limiter.IsAllowed(ctx)
@@ -585,9 +627,9 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
-	t.Run("Test Key Format Verification", func(t *testing.T) {
-		// 测试key格式验证
-		now := time.Now()
+	t.Run("Test Key Format Verification with Mock Clock", func(t *testing.T) {
+		// 使用固定时间作为起始时间
+		startTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 
 		testCases := []struct {
 			name     string
@@ -621,16 +663,16 @@ func TestRateLimiter(t *testing.T) {
 				expectedKeyFormat := ""
 				switch tc.timeUnit {
 				case 24 * time.Hour:
-					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, now.Format("20060102"))
+					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, startTime.Format("20060102"))
 				case time.Hour:
-					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, now.Format("2006010215"))
+					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, startTime.Format("2006010215"))
 				case time.Minute:
-					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, now.Format("200601021504"))
+					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, startTime.Format("200601021504"))
 				case time.Second:
-					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, now.Format("20060102150405"))
+					expectedKeyFormat = fmt.Sprintf("%s:%s", tc.key, startTime.Format("20060102150405"))
 				default:
 					// 对于毫秒级别，使用纳秒时间戳
-					expectedKeyFormat = fmt.Sprintf("%s:%d", tc.key, now.UnixNano()/int64(tc.timeUnit))
+					expectedKeyFormat = fmt.Sprintf("%s:%d", tc.key, startTime.UnixNano()/int64(tc.timeUnit))
 				}
 
 				t.Logf("Time unit: %v, Expected key format: %s", tc.timeUnit, expectedKeyFormat)
@@ -661,7 +703,8 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
-	t.Run("Test Time Window Transition", func(t *testing.T) {
+	t.Run("Test Time Window Transition with Mock Clock", func(t *testing.T) {
+
 		// 测试时间窗口切换逻辑
 		testCases := []struct {
 			name     string
@@ -702,7 +745,7 @@ func TestRateLimiter(t *testing.T) {
 					t.Errorf("Expected remaining 2, got %d", remaining1)
 				}
 
-				// 等待时间窗口切换
+				// 将时间推进超过等待时间以切换时间窗口
 				time.Sleep(tc.waitTime)
 
 				// 第二次请求应该在新的时间窗口中
