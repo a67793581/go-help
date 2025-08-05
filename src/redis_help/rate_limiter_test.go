@@ -10,39 +10,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 )
 
-// Clock 接口用于时间操作
-type Clock interface {
-	Now() time.Time
-}
-
-// RealClock 真实时间实现
-type RealClock struct{}
-
-func (RealClock) Now() time.Time {
-	return time.Now()
-}
-
-// MockClock 模拟时间实现
-type MockClock struct {
-	currentTime time.Time
-}
-
-func NewMockClock(startTime time.Time) *MockClock {
-	return &MockClock{currentTime: startTime}
-}
-
-func (m *MockClock) Now() time.Time {
-	return m.currentTime
-}
-
-func (m *MockClock) SetTime(t time.Time) {
-	m.currentTime = t
-}
-
-func (m *MockClock) Add(d time.Duration) {
-	m.currentTime = m.currentTime.Add(d)
-}
-
 // 修改原有的RateLimiter结构体以支持Clock接口
 func TestRateLimiter(t *testing.T) {
 	// 使用miniredis创建模拟的Redis服务器
@@ -182,9 +149,6 @@ func TestRateLimiter(t *testing.T) {
 	})
 
 	t.Run("Test Time Unit Key Generation with Mock Clock", func(t *testing.T) {
-		// 使用固定时间作为起始时间
-		startTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
-		mockClock := NewMockClock(startTime)
 
 		config := RateLimitConfig{
 			Key:      "test_timeunit",
@@ -213,9 +177,6 @@ func TestRateLimiter(t *testing.T) {
 		if remaining != 1 {
 			t.Errorf("Expected remaining 1, got %d", remaining)
 		}
-
-		// 将时间向前推进超过时间单位
-		mockClock.Add(time.Millisecond * 150)
 
 		// 时间单位过期后，应该重新开始计数（剩余次数为2）
 		allowed, remaining, err = limiter.IsAllowed(ctx)

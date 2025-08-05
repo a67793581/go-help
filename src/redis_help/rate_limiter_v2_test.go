@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -121,6 +122,16 @@ func TestRateLimiterV2_IsAllowed(t *testing.T) {
 		Addr: s.Addr(),
 	})
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	config := RateLimitConfigV2{
 		Key:      "test_limit",
 		MaxCount: 3,
@@ -167,6 +178,16 @@ func TestRateLimiterV2_GetCurrentCount(t *testing.T) {
 		Addr: s.Addr(),
 	})
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	config := RateLimitConfigV2{
 		Key:      "test_current",
 		MaxCount: 10,
@@ -204,6 +225,16 @@ func TestRateLimiterV2_GetRemainingCount(t *testing.T) {
 		Addr: s.Addr(),
 	})
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	config := RateLimitConfigV2{
 		Key:      "test_remaining",
 		MaxCount: 5,
@@ -238,6 +269,16 @@ func TestRateLimiterV2_IncreaseCount(t *testing.T) {
 
 	client := redis.NewClient(&redis.Options{
 		Addr: s.Addr(),
+	})
+
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
 	})
 
 	config := RateLimitConfigV2{
@@ -287,6 +328,16 @@ func TestRateLimiterV2_SetCount(t *testing.T) {
 		Addr: s.Addr(),
 	})
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	config := RateLimitConfigV2{
 		Key:      "test_set",
 		MaxCount: 10,
@@ -329,6 +380,16 @@ func TestRateLimiterV2_ResetRateLimit(t *testing.T) {
 
 	client := redis.NewClient(&redis.Options{
 		Addr: s.Addr(),
+	})
+
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
 	})
 
 	config := RateLimitConfigV2{
@@ -380,6 +441,16 @@ func TestRateLimiterV2_GetConfig(t *testing.T) {
 		Addr: s.Addr(),
 	})
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	tz := time.FixedZone("TestZone", 8*3600) // UTC+8
 
 	config := RateLimitConfigV2{
@@ -406,6 +477,16 @@ func TestRateLimiterV2_TimezoneHandling(t *testing.T) {
 
 	client := redis.NewClient(&redis.Options{
 		Addr: s.Addr(),
+	})
+
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
 	})
 
 	// 使用UTC时区
@@ -450,6 +531,16 @@ func TestRateLimiterV2_DifferentTimeUnits(t *testing.T) {
 
 	ctx := context.Background()
 
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 固定一个时间点
+	fixedTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return fixedTime
+	})
+
 	// 测试按秒限流
 	secondConfig := RateLimitConfigV2{
 		Key:      "test_second",
@@ -473,8 +564,11 @@ func TestRateLimiterV2_DifferentTimeUnits(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, allowed)
 
-	// 等待一秒，计数器应该重置
-	time.Sleep(time.Second)
+	// 通过修改mock的时间来模拟时间流逝
+	newTime := fixedTime.Add(time.Second)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return newTime
+	})
 
 	// 应该再次允许
 	allowed, _, err = secondLimiter.IsAllowed(ctx)
