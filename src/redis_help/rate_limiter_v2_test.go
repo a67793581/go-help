@@ -510,8 +510,8 @@ func TestRateLimiterV2_TimezoneHandling(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证两个限流器使用不同的key（因为时区不同）
-	utcKey := utcLimiter.generateTimeKey()
-	cstKey := cstLimiter.generateTimeKey()
+	utcKey := utcLimiter.GenerateTimeKey()
+	cstKey := cstLimiter.GenerateTimeKey()
 
 	// 如果当前时间在不同时区属于不同小时，则key应该不同
 	assert.NotEqual(t, utcKey, cstKey)
@@ -571,4 +571,58 @@ func TestRateLimiterV2_DifferentTimeUnits(t *testing.T) {
 	allowed, _, err = secondLimiter.IsAllowed(ctx)
 	assert.NoError(t, err)
 	assert.True(t, allowed)
+}
+
+func TestRateLimiterV2_CrossDayHandling(t *testing.T) {
+	s, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer s.Close()
+
+	client := redis.NewClient(&redis.Options{
+		Addr: s.Addr(),
+	})
+
+	// 使用gomonkey mock time.Now函数
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	// 加载中国时区
+	cst, _ := time.LoadLocation("Asia/Shanghai")
+
+	config := RateLimitConfigV2{
+		Key:      "test_cross_day",
+		MaxCount: 10,
+		TimeUnit: time.Hour * 24, // 按天限流
+		Timezone: cst,
+	}
+
+	rl, err := NewRateLimiterV2(client, config)
+	assert.NoError(t, err)
+
+	// 模拟中国时间23点（第一天）
+	time23 := time.Date(2023, 1, 1, 23, 30, 0, 0, cst)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return time23
+	})
+
+	// 在23点发起请求
+	key23 := rl.GenerateTimeKey()
+
+	// 模拟中国时间第二天1点
+	time1 := time.Date(2023, 1, 2, 1, 30, 0, 0, cst)
+	patches.ApplyFunc(time.Now, func() time.Time {
+		return time1
+	})
+
+	// 在1点发起请求
+	key1 := rl.GenerateTimeKey()
+
+	// 验证两个时间点使用的是不同的key
+	assert.NotEqual(t, key23, key1, "不同日期应该生成不同的key")
+
+	// 验证23点的key包含第一天的日期
+	assert.Contains(t, key23, "test_cross_day:20230101")
+
+	// 验证1点的key包含第二天的日期
+	assert.Contains(t, key1, "test_cross_day:20230102")
 }

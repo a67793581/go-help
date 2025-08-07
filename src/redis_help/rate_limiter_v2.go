@@ -65,8 +65,8 @@ func NewRateLimiterV2(client redis.UniversalClient, config RateLimitConfigV2) (*
 	}, nil
 }
 
-// generateTimeKey 生成包含时间单位的key
-func (rl *RateLimiterV2) generateTimeKey() string {
+// GenerateTimeKey 生成包含时间单位的key
+func (rl *RateLimiterV2) GenerateTimeKey() string {
 	// 使用指定时区的时间
 	now := time.Now().In(rl.timezone)
 	var timeKey string
@@ -95,8 +95,8 @@ func (rl *RateLimiterV2) generateTimeKey() string {
 	return fmt.Sprintf("%s:%s", rl.key, timeKey)
 }
 
-// calculateExpireTime 计算过期时间（时间单位的2倍，确保足够长）
-func (rl *RateLimiterV2) calculateExpireTime() time.Duration {
+// ExpireTime 计算过期时间（时间单位的2倍，确保足够长）
+func (rl *RateLimiterV2) ExpireTime() time.Duration {
 	// 过期时间设置为时间单位的2倍，确保在时间单位结束后key还能存在一段时间
 	return rl.timeUnit * 2
 }
@@ -105,10 +105,10 @@ func (rl *RateLimiterV2) calculateExpireTime() time.Duration {
 // 返回是否允许，剩余次数，以及错误信息
 func (rl *RateLimiterV2) IsAllowed(ctx context.Context) (bool, int64, error) {
 	// 生成包含时间单位的key
-	timeKey := rl.generateTimeKey()
+	timeKey := rl.GenerateTimeKey()
 
 	// 计算过期时间
-	expireTime := rl.calculateExpireTime()
+	expireTime := rl.ExpireTime()
 
 	// 使用Lua脚本确保原子性操作（改为增量计数模式）
 	script := `
@@ -162,7 +162,7 @@ func (rl *RateLimiterV2) IsAllowed(ctx context.Context) (bool, int64, error) {
 // GetCurrentCount 获取当前已使用次数
 func (rl *RateLimiterV2) GetCurrentCount(ctx context.Context) (int64, error) {
 	// 生成包含时间单位的key
-	timeKey := rl.generateTimeKey()
+	timeKey := rl.GenerateTimeKey()
 
 	count, err := rl.client.Get(ctx, timeKey).Int64()
 	if err != nil {
@@ -197,10 +197,10 @@ func (rl *RateLimiterV2) IncreaseCount(ctx context.Context, increment int64) err
 	}
 
 	// 生成包含时间单位的key
-	timeKey := rl.generateTimeKey()
+	timeKey := rl.GenerateTimeKey()
 
 	// 计算过期时间
-	expireTime := rl.calculateExpireTime()
+	expireTime := rl.ExpireTime()
 	expireSeconds := int(expireTime.Seconds())
 
 	// 确保过期时间至少为1秒
@@ -239,10 +239,10 @@ func (rl *RateLimiterV2) SetCount(ctx context.Context, count int64) error {
 	}
 
 	// 生成包含时间单位的key
-	timeKey := rl.generateTimeKey()
+	timeKey := rl.GenerateTimeKey()
 
 	// 计算过期时间
-	expireTime := rl.calculateExpireTime()
+	expireTime := rl.ExpireTime()
 	expireSeconds := int(expireTime.Seconds())
 
 	// 确保过期时间至少为1秒
@@ -261,7 +261,7 @@ func (rl *RateLimiterV2) SetCount(ctx context.Context, count int64) error {
 // ResetRateLimit 重置限流计数器
 func (rl *RateLimiterV2) ResetRateLimit(ctx context.Context) error {
 	// 生成包含时间单位的key
-	timeKey := rl.generateTimeKey()
+	timeKey := rl.GenerateTimeKey()
 
 	_, err := rl.client.Del(ctx, timeKey).Result()
 	if err != nil {
